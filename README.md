@@ -42,3 +42,6 @@ Hopefully the files are explanatory, the front friction fits onto the back, the 
 
 
 The Raspberry Pi Pico uses M1.6 threaded inserts and cross head screws
+
+
+![insert](https://github.com/user-attachments/assets/3d1da86b-5eef-41c8-ad0e-7fff1fe37c25)
