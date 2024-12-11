@@ -5,6 +5,8 @@ from machine import Pin
 import urequests
 import neopixel
 
+NUM_LEDS = 42
+
 # Function to fetch the latest reading from the NIST Randomness Beacon
 def fetch_nist_randomness_beacon(retries=3, delay=2):
     for attempt in range(retries):
@@ -20,44 +22,31 @@ def fetch_nist_randomness_beacon(retries=3, delay=2):
         sleep(delay)
     return None
 
-# Function to convert alphanumeric characters to integers scaled from 0 to 255
-def convert_beacon_value_to_int_array(beacon_value):
-    char_to_value = {ch: idx for idx, ch in enumerate('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ')}
-    int_array = []
-    
-    for char in beacon_value:
-        if char in char_to_value:
-            scaled_value = int((char_to_value[char] / 35) * 255)
-            int_array.append(scaled_value)
-        else:
-            print(f'Unexpected character "{char}" in beacon value')
-            int_array.append(0)  # Default to 0 for unexpected characters
-    
-    return int_array
-
 # Function to update the WS2812B LEDs with a specific color
 def set_leds_color(np, color):
-    for i in range(42):
+    for i in range(NUM_LEDS):
         np[i] = color
     np.write()
 
-# Function to cascade LED values to their positions
-def cascade_leds(np, int_array):
-    for i in range(42):
-        r = int_array[i * 3]
-        g = int_array[i * 3 + 1]
-        b = int_array[i * 3 + 2]
+def hex_to_rgb_scale(hex):
+    return int(int(hex, 16) * (255/16))
+
+# Function to cascade LED values to their positions.
+# The final two beacon_values [126] and [127] are unused :( 
+def cascade_leds(np, beacon_value):
+    for i in range(NUM_LEDS):
+        r = hex_to_rgb_scale(beacon_value[i * 3 + 0])
+        g = hex_to_rgb_scale(beacon_value[i * 3 + 1])
+        b = hex_to_rgb_scale(beacon_value[i * 3 + 2])
         
         # Move the current LED value to its proper location
         for j in range(i, -1, -1):
             np[j] = (r, g, b) if j == 0 else np[j-1]
             np.write()
             sleep(0.001)  # Adjust the delay for visual effect
-            if j != 0:
-                np[j-1] = (0, 0, 0)  # Turn off the previous LED
 
 # Initialize the WS2812B LED strip
-np = neopixel.NeoPixel(Pin(16), 42)  # Assuming GPIO14 is used for data signal
+np = neopixel.NeoPixel(Pin(16), NUM_LEDS)  # Assuming GPIO14 is used for data signal
 
 # Set all LEDs to RED
 set_leds_color(np, (255, 0, 0))
@@ -96,13 +85,11 @@ if wlan.isconnected():
 
             # Fetch and print the latest NIST Randomness Beacon reading
             beacon_value = fetch_nist_randomness_beacon()
-            if beacon_value:
+            # The beacon_value should be char[128] containing ascii "0123456789abcdef"
+            if beacon_value and len(beacon_value) == 128:
                 print('Latest NIST Randomness Beacon reading:', beacon_value)
-                # Convert the beacon value to an array of integers
-                int_array = convert_beacon_value_to_int_array(beacon_value)
-                print('Converted integer array:', int_array)
                 # Cascade the LED values
-                cascade_leds(np, int_array)
+                cascade_leds(np, beacon_value)
             else:
                 print('Could not retrieve the NIST Randomness Beacon reading.')
         except Exception as e:
@@ -112,3 +99,4 @@ if wlan.isconnected():
         sleep(65)
 else:
     print('Failed to connect to the WiFi network.')
+
